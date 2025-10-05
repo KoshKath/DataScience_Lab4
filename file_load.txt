@@ -1,0 +1,13 @@
+# file_load.py
+import pandas as pd
+
+def data_load(ds_path):
+  # загрузка данных файла CSV в DataFrame
+  df = pd.read_csv(ds_path)
+  # просмотр 5-ти первых строк датасета
+  print(df.head())
+  # получение общей инфы о датасете
+  print(df.info())
+  # вывод статистических данных о числовых столбцах
+  print(df.describe())
+  return df
