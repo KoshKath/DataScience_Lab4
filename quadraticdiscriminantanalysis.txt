@@ -1,0 +1,78 @@
+# quadraticdiscriminantanalysis.py
+# QDA - квадратичный дискриминантный анализ
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import TruncatedSVD
+from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import (accuracy_score, classification_report,
+                             confusion_matrix, ConfusionMatrixDisplay,
+                             roc_curve, auc)
+
+def quadraticdiscriminantanalysis(df, X, y): 
+  # разделение данных на обучающий и тестовый наборы
+  X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=50, stratify=y)
+
+  # создание pipeline с TF-IDF, SVD и QDA
+  pipe = Pipeline([
+      ('tfidf', TfidfVectorizer(stop_words='english', max_features=5000)), # векторизация
+      ('svd', TruncatedSVD(random_state=50)), # снижение размерности, т.к. текстовые данные разреженны и многомерны
+      ('qda', QuadraticDiscriminantAnalysis()) # модель QDA
+  ])
+
+  # настройка параметров с GridSearch
+  param_grid = {
+      'svd__n_components': [20, 50, 100],  # количество признаков после снижения размерности
+      'qda__tol': [1e-3, 1e-4, 1e-5]    # порог регуляризации - для избегания проблем с вычислением ковариационной матрицы
+  }
+  grid_search = GridSearchCV(pipe, param_grid, cv=3, scoring='accuracy', n_jobs=-1)
+  grid_search.fit(X_train, y_train)
+
+  # предсказание классов на тестовом наборе данных
+  best_model = grid_search.best_estimator_
+  y_pred = best_model.predict(X_test)
+  print(f"Лучшие параметры: {grid_search.best_params_}")
+  print(f"Лучшее качество на кросс-валидации: {grid_search.best_score_:.4f}")
+
+  # вывод полного отчета
+  print("Accuracy:", accuracy_score(y_test, y_pred))
+  print('Базовый отчет:')
+  print(classification_report(y_test, y_pred))
+  # матрица ошибок
+  print('Матрица ошибок:')
+  conf_matrix = confusion_matrix(y_test, y_pred)
+  disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=["Не спам", "Спам"])
+  disp.plot(cmap='Blues')
+  # кривая ROC-AUC
+  y_proba = best_model.predict_proba(X_test)[:, 1]  # вероятность принадлежности к классу "Спам"
+  fpr, tpr, thresholds = roc_curve(y_test, y_proba)
+  roc_auc = auc(fpr, tpr)
+  plt.figure()
+  plt.plot(fpr, tpr, label=f'ROC curve (AUC = {roc_auc:.2f})')
+  plt.plot([0, 1], [0, 1], 'k--')  # диагональ
+  plt.xlabel('Ложноположительные результаты') # уровень ложноположительных результатов
+  plt.ylabel('Истинноположительные результаты') # уровень истинноположительных результатов
+  plt.title('ROC-кривая')
+  plt.legend(loc='lower right')
+  plt.grid()
+  plt.show()
+ 
+  # дополнительно - визуализация снижения размерности 2D с целью последующего применения QDA
+  vectorizer = TfidfVectorizer(stop_words='english', max_features=5000)
+  X_tfidf = vectorizer.fit_transform(X)
+  svd_2d = TruncatedSVD(n_components=2, random_state=50)
+  X_reduced_2d = svd_2d.fit_transform(X_tfidf)
+  df_vis = pd.DataFrame({
+      'Component 1': X_reduced_2d[:, 0],
+      'Component 2': X_reduced_2d[:, 1],
+      'Label': y
+  })
+  plt.figure(figsize=(8, 6))
+  sns.scatterplot(data=df_vis, x='Component 1', y='Component 2',
+                  hue='Label', palette=['green', 'red'], alpha=0.5)
+  plt.title('2D Projection of Emails after SVD')
+  plt.show()
+  return

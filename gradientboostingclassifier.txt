@@ -1,0 +1,53 @@
+# gradientboostingclassifier.py
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, accuracy_score
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import roc_curve, auc
+import matplotlib.pyplot as plt
+
+def gradientboostingclassifier(df, X, y):
+  # разделение данных на обучающий и тестовый наборы
+  X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=50)
+
+  # векторизация текста (text)
+  # stop_words='english' — игнорирование распространённых слов (например, "and", "the"), которые мало влияют на смысл
+  # max_features=3000 — берём только 3000 самых информативных слов
+  # обучение векторизатора на обучающем наборе данных (fit_transform), затем применение к тестовому набору данных (transform)
+  vectorizer = TfidfVectorizer(stop_words='english', max_features=3000)
+  X_train_vec = vectorizer.fit_transform(X_train)
+  X_test_vec = vectorizer.transform(X_test)
+
+  # создание модели Gradient Boosting Classifier
+  gb_classifier = GradientBoostingClassifier(n_estimators=100, max_depth=1, learning_rate=0.1, random_state=50)
+
+  # обучение модели на обучающем наборе данных (с учетом векторизованных обучающих данных X_train_vec)
+  gb_classifier.fit(X_train_vec, y_train)
+
+  # предсказание классов на тестовом наборе данных
+  y_pred = gb_classifier.predict(X_test_vec)
+
+  # вывод полного отчета
+  print("Accuracy:", accuracy_score(y_test, y_pred))
+  print('Базовый отчет:')
+  print(classification_report(y_test, y_pred))
+  # матрица ошибок
+  print('Матрица ошибок:')
+  conf_matrix = confusion_matrix(y_test, y_pred)
+  disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=["Не спам", "Спам"])
+  disp.plot(cmap='Blues')
+  # кривая ROC-AUC
+  y_proba = gb_classifier.predict_proba(X_test_vec)[:, 1]  # вероятность принадлежности к классу "Спам"
+  fpr, tpr, thresholds = roc_curve(y_test, y_proba)
+  roc_auc = auc(fpr, tpr)
+  plt.figure()
+  plt.plot(fpr, tpr, label=f'ROC curve (AUC = {roc_auc:.2f})')
+  plt.plot([0, 1], [0, 1], 'k--')  # диагональ
+  plt.xlabel('Ложноположительные результаты') # уровень ложноположительных результатов
+  plt.ylabel('Истинноположительные результаты') # уровень истинноположительных результатов
+  plt.title('ROC-кривая')
+  plt.legend(loc='lower right')
+  plt.grid()
+  plt.show()
+  return

@@ -1,0 +1,10 @@
+# data_quality.py
+import seaborn as sns
+import pandas as pd
+import matplotlib.pyplot as plt
+
+def data_quality(df):
+  sns.countplot(data = df, x = 'target')
+  plt.title('"Распределение сообщений по классам" (0-не спам, 1-спам)', fontsize=12)
+  plt.show()
+  return

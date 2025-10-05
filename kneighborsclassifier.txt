@@ -1,0 +1,60 @@
+# kneighborsclassifier.py
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, ConfusionMatrixDisplay
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import roc_curve, auc
+
+def kneighborsclassifier(df, X, y):
+  # разделение данных на обучающий и тестовый наборы
+  X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=50, stratify=y)
+
+  # векторизация текста (text)
+  # stop_words='english' — игнорирование распространённых слов (например, "and", "the"), которые мало влияют на смысл
+  # max_features=3000 — берём только 3000 самых информативных слов
+  # обучение векторизатора на обучающем наборе данных (fit_transform), затем применение к тестовому набору данных (transform)
+  vectorizer = TfidfVectorizer(stop_words='english', max_features=3000)
+  X_train_vec = vectorizer.fit_transform(X_train)
+  X_test_vec = vectorizer.transform(X_test)
+
+  # настройка гиперпараметра k с использованием GridSearchCV
+  param_grid = {'n_neighbors': np.arange(1, 50)}
+  knn = KNeighborsClassifier()
+  knn_cv = GridSearchCV(knn, param_grid, cv=5)
+  knn_cv.fit(X_train_vec, y_train)
+
+  # обучение модели с лучшим значением k
+  knn_best = KNeighborsClassifier(n_neighbors=knn_cv.best_params_['n_neighbors'])
+  knn_best.fit(X_train_vec, y_train)
+
+  # предсказание на тестовом наборе
+  y_pred = knn_best.predict(X_test_vec)
+
+  # Вывод лучшего значения k
+  print("Лучшее значение k:", knn_cv.best_params_['n_neighbors'])
+
+  # вывод полного отчета
+  print("Accuracy:", accuracy_score(y_test, y_pred))
+  print('Базовый отчет:')
+  print(classification_report(y_test, y_pred))
+  # матрица ошибок
+  print('Матрица ошибок:')
+  conf_matrix = confusion_matrix(y_test, y_pred)
+  disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=["Не спам", "Спам"])
+  disp.plot(cmap='Blues')
+  # кривая ROC-AUC
+  y_proba = knn_best.predict_proba(X_test_vec)[:, 1]  # вероятность принадлежности к классу "Спам"
+  fpr, tpr, thresholds = roc_curve(y_test, y_proba)
+  roc_auc = auc(fpr, tpr)
+  plt.figure()
+  plt.plot(fpr, tpr, label=f'ROC curve (AUC = {roc_auc:.2f})')
+  plt.plot([0, 1], [0, 1], 'k--')  # диагональ
+  plt.xlabel('Ложноположительные результаты') # уровень ложноположительных результатов
+  plt.ylabel('Истинноположительные результаты') # уровень истинноположительных результатов
+  plt.title('ROC-кривая')
+  plt.legend(loc='lower right')
+  plt.grid()
+  plt.show()
+  return
